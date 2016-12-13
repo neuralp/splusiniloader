@@ -1,0 +1,412 @@
+//******************************************************************************
+// Program 			: INI Loader
+// Written By 		: Nicholas Pepper
+//******************************************************************************
+
+#HELP_BEGIN
+
+Program : INI Loader 1.0
+By      : Nicholas Pepper
+Version : 1.0
+
+This simple module takes an configuration file (default is \NVRAM\system.conf) and 
+parses information out of it.  You can send it digital, analog, or serial values 
+directly from an ini style text file when sections are not being used.  Input after 
+semi-colons is treated as a comment.
+
+When a section comes up, all strings following the section header are directly
+passed out the bus for processing by other modules.
+
+What this means, is that all parameters that you would like to load directly into
+this module generically need to be defined before a section is declared.  You
+have 1 to 100 signals defined for each type of signal for you to utilize.
+
+For analog values specifically, you can append an 's' to the number and the module
+will do the conversion to ticks for you.  This is uesful for time parameters.
+**NOTE** that I do not process HH.MM.SSs format, everything must be in generic
+seconds with the maximum time of 655.35 seconds.
+
+[section]
+
+The above formatting starts a section, and all values, no matter what they are,
+are directly passed to the bus out.  The only exception to this is still comments,
+which will just be dropped.
+
+Format of the file for generic signals:
+
+<value_type><value_number>=<data>
+
+dv1=0 (or 1) : set digital output ### to either 0 or 1
+av1=512 : set analog value 1 to a value of 512
+sv1=Conference : set serial value 1 to "Conference"
+
+Format of the file for other module signals:
+
+[<section>]
+
+<key>=<value>
+
+Version History
+
+1.0		Initial version
+
+#HELP_END
+
+//******************************************************************************
+// Configuration Constants
+//******************************************************************************
+
+//#define_constant debug 1
+#define_constant version "1.0"
+
+//******************************************************************************
+// Compiler Directives
+//******************************************************************************
+
+#symbol_name "INI Loader 1.0"
+#CATEGORY "0" // Not Visible
+
+//******************************************************************************
+// Input and Output
+//******************************************************************************
+
+digital_input load;
+digital_input use_nvram;
+digital_input use_cf;
+string_input filename[50];
+string_output bus_out$;
+digital_output dValues[100];
+analog_output aValues[100];
+string_output sValues[100];
+
+//******************************************************************************
+// Sockets
+//******************************************************************************
+
+//******************************************************************************
+// Parameters and Properties
+//******************************************************************************
+
+//******************************************************************************
+// Structures
+//******************************************************************************
+
+//******************************************************************************
+// Global Variables
+//******************************************************************************
+
+string filename$[50];	//filename to load from
+string section$[120];	//the current section the module is parsing
+
+//******************************************************************************
+// Functions
+//******************************************************************************
+
+/***************************************************************
+function : splitLine() : parses 'line' into the command and data
+		   portion (seperated by a '=').
+INPUT : line : the string to parse
+OUTPUT : command : the part before the equal sign, if no equal
+		 sign is found, then the whole line is returned as the
+		 command
+		 data : the data portion (after the equal sign)
+***************************************************************/
+function splitLine(string line, string command, string data)
+{
+	integer eqp;
+	string temp[1];
+	
+	eqp = find("=", line);
+	
+	if (eqp != 0)
+	{
+		command = left(line, eqp-1);
+		temp = remove("\x20", command);
+		data = right(line, len(line)-eqp);
+	}
+	else
+	{
+		command = line;
+	}
+}
+
+/***************************************************************
+function : removeComment() : Removes comments from the end of the
+line.  ***NOTE I am not parsing the whole line or multiple lines
+into tokens to determine of the comment symbol (which is ;) is 
+possibly part of a string.  Anything after the ; will be removed!
+INPUT : line : the string to parse
+OUTPUT : line without the comment
+***************************************************************/
+string_function removeComment(string line)
+{
+	integer eqp;
+	
+	eqp = find(";", line);
+	
+	if (eqp != 0)
+	{
+		return (left(line, eqp-1));
+	}
+	else
+	{
+ 		return (line);
+	}
+}
+
+/***************************************************************
+parseLine() : This function will take a line of config data and 
+			  parse it into usable data specific to this module.
+			  This function will not be transferrable and relies
+			  on global variables.
+***************************************************************/
+integer_function parseLine(string line)
+{
+	string command[10], data[100];
+	integer vPos, start, end;					//array position
+	integer tMult;								//time multiplier
+	
+	tMult = 1;
+	
+#if_defined debug
+	print("%s\n", line);
+#endif
+
+	//skip empty line
+	if ( len(line) = 0 )
+	{
+#if_defined debug
+		print("--skip line\n");
+#endif
+		return (1);
+	}
+	//if a new section is found, all items under a new section are passed
+	//directly on to the bus for other modules to parse
+	else if ( find("[",line) && find("]",line) ) {
+		start = find("[",line);
+		end = find("]",line);
+		section$ = mid(line, start+1, end-start-1);
+#if_defined debug
+		print("--section found: %s\n", section$);
+#endif
+		return(1);
+	}
+	//if we are in a section (other module) then send these out the bus
+	//for other module to parse
+	else if ( len(section$) ) {
+		makestring(bus_out$, "%s::%s", section$, line);
+		ProcessLogic();
+#if_defined debug
+		print("--bus out\n");
+		print("%s::%s\n", section$, line);
+#endif
+		return(1);
+	}
+	//standard "parameter=value" style generic lines when not in a section
+	else if ( find("=",line) )
+	{
+		splitLine(line, command, data);
+	
+		//digital value was found
+		if ( find("dv",command) )
+		{
+			vPos = atoi(command);
+#if_defined debug
+	print("--digital found : %s : %s\n", command, data);
+	print("--output %i\n", vPos);
+#endif
+			if (vPos > 0 && vPos <= 100)
+			{
+				if ( isSignalDefined(dValues[vPos]) )
+				{
+					dValues[vPos] = atoi(data);
+				}
+				return(1);
+			}
+			else {
+				return (0);
+			}
+		}
+		//analog value was found
+		if ( find("av",command) )
+		{
+			vPos = atoi(command);
+#if_defined debug
+	print("--analog found : %s : %s\n", command, data);
+	print("--output %i\n", vPos);
+#endif
+			if (vPos > 0 && vPos <= 100)
+			{
+				//time multiplier if seconds defined
+				if ( find("s", data) ) {
+					tMult = 100;
+				}
+				
+				if ( isSignalDefined(aValues[vPos]) )
+				{
+					aValues[vPos] = atoi(data) * tMult;
+				}
+				return(1);
+			}
+			else {
+				return (0);
+			}
+		}
+		//string value was found
+		if ( find("sv",command) )
+		{
+			vPos = atoi(command);
+#if_defined debug
+	print("--string found : %s : %s\n", command, data);
+	print("--output %i\n", vPos);
+#endif
+			if (vPos > 0 && vPos <= 100)
+			{
+				if ( isSignalDefined(sValues[vPos]) )
+				{
+					sValues[vPos] = data;
+				}
+				return(1);
+			}
+			else {
+				return (0);
+			}
+		}
+		else
+		{
+			//generic line error
+			return (0);
+		}
+	}
+	return (0);
+}
+
+/***************************************************************
+load_zones() : This function will load the ini list from
+disk
+***************************************************************/
+integer_function load_ini(string fname)
+{
+	integer oldlen;
+	signed_integer filehandle;
+	signed_integer readStatus;
+	long_integer file_length;
+	long_integer current_file_position;
+	string from_file[32768];
+	string parse_buffer[65534];
+	string line[120];
+	integer char;
+
+	readStatus = 0;
+	current_file_position = 0;
+		
+	print ("DB - INI Loader %s : %s\n", version, fname);
+
+	// most of the code below is for error handeling of file operations
+
+	if ( StartFileOperations() < 0 )
+	{
+		print ("DB - INI Loader : File operation cannot be started\n");
+	}
+	else
+	{	
+#IF_SERIES2
+		filehandle = FileOpen (fname, _O_RDONLY);
+#ENDIF
+#IF_SERIES3
+		filehandle = FileOpen (fname, _O_RDONLY || _O_BINARY);
+#ENDIF
+		
+		if ( filehandle < 0 )
+		{
+			print ("DB - INI Loader : Error In Source Reading : %d\n",filehandle);
+			return (0);
+		}
+
+		file_length = fileLength(filehandle);
+		
+		// now parse the buffer file
+		do
+		{
+			readStatus = FileRead(filehandle, from_file, 32768);
+            parse_buffer = parse_buffer + from_file;
+            clearBuffer(from_file);
+			
+			while (find("\x0A", parse_buffer)) {
+			
+				//remove a full line from the beginning
+				line = remove("\x0A", parse_buffer);
+				//remove CRLF
+				line = left(line, len(line) - 2 );
+	
+				if ( !parseLine(removeComment(line)) )
+					print ("DB - INI Loader : Parsing error. Line parsed follows:\n%s\n", line);
+				clearbuffer(line);
+			}
+		}
+		until ( FileEOF(filehandle) );	//until not removing chars any more
+
+		// this next line is very important, if the file is not closed, the system will eventually
+		// crash
+
+		if ( FileClose (filehandle) <> 0 )
+		{
+			print ("DB - INI Loader : Error closing file\n");
+			return (0);
+		}
+		
+		if ( EndFileOperations() < 0 )
+		{
+			print ("DB - INI Loader : Error ending file operations\n");
+			return (0);
+		}
+		
+    	print ("DB - INI Loader : File loaded!\n");
+	}
+	return (1);
+}
+
+//******************************************************************************
+// Events
+//******************************************************************************
+              
+push load
+{
+	integer x;
+
+	if ( load_ini(filename$) )
+	{
+		
+	}
+}
+
+push use_nvram
+{
+	makestring(filename$, "\\NVRAM\\%s", filename);
+}
+
+push use_cf
+{
+	makestring(filename$, "\\CF0\\%s", filename);
+}
+
+change filename
+{
+	if (use_cf) {
+		makestring(filename$, "\\CF0\\%s", filename);
+	}
+	else {
+		makestring(filename$, "\\NVRAM\\%s", filename);		
+	}
+}
+           
+//******************************************************************************
+// Function Main()
+//******************************************************************************
+
+function main()
+{
+	filename = "system.conf";	//default file name
+	filename$ = "\\NVRAM\\system.conf";	//default full file path
+	clearBuffer(section$);
+}

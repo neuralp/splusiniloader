@@ -1,0 +1,151 @@
+//******************************************************************************
+// Program 			: Bus Settings
+// Written By 		: Nicholas Pepper
+//******************************************************************************
+
+#HELP_BEGIN
+
+Program : INI Loader <type> 1.0
+By      : Nicholas Pepper
+Version : 1.0
+
+This file looks for the bus id defined in the module and then parses the ini
+settings out of it.  The ids[x] are string constants.  There are three different
+modules in this set, one for each data type.  This was done so that I can keep
+the module looking small and concise with clearly defined and aligend parameters.
+
+Format of the bus string:
+
+<bus_id>::<data_id>=<data>
+
+example:
+
+	display1::enable poll=0
+
+Version History
+
+1.0		Initial version
+
+#HELP_END
+
+//******************************************************************************
+// Configuration Constants
+//******************************************************************************
+
+//#define_constant debug 1
+#define_constant version "1.0"
+
+//******************************************************************************
+// Compiler Directives
+//******************************************************************************
+
+#symbol_name "Bus Settings Serial 1.0"
+#CATEGORY "12" // System Control
+
+//******************************************************************************
+// Input and Output
+//******************************************************************************
+
+string_input bus_in$[256];
+string_output values[32,32];
+
+//******************************************************************************
+// Sockets
+//******************************************************************************
+
+//******************************************************************************
+// Parameters and Properties
+//******************************************************************************
+
+string_parameter ids[32][64];
+string_parameter bus_id[64];
+
+#begin_parameter_properties ids
+	propValidUnits=unitString;
+#end_parameter_properties
+
+//******************************************************************************
+// Structures
+//******************************************************************************
+
+//******************************************************************************
+// Global Variables
+//******************************************************************************
+
+//******************************************************************************
+// Functions
+//******************************************************************************
+
+#user_library "Bus_Library"
+
+/***************************************************************
+parseLine() : This function will take a line of config data and 
+			  parse it into usable data specific to this module.
+			  This function will not be transferrable and relies
+			  on global variables.
+***************************************************************/
+integer_function parseLine(string line)
+{
+	string command[64], data[128];
+	integer i;
+	integer vPos;					//array position
+	
+	//skip empty line
+	if ( len(line) = 0 )
+	{
+#if_defined debug
+		print("--skip line\n");
+#endif
+		return (1);
+	}
+	else if ( find("=",line) )
+	{
+		splitLine(line, command, data);
+#if_defined debug
+		print("DB : Command/Data : %s : %s\n", command, data);
+#endif		
+
+		for (i = 1 to 32) {
+			if (command = ids[i]) {
+				values[i] = data;
+				return(1);
+			}
+		}
+#if_defined debug
+		print("DB - Bus Settings - ID not found : %s\n", command);
+#endif
+	}
+	else if ( line = "report" ) {
+		print (";----------------------------- %s ---------------------------------\n\n", bus_id);
+		print ("[%s[\n", bus_id);
+		for (i = 1 to 32) {
+			if ( ids[i] != "0d" ) {
+				print("%s=\n",ids[i]);
+			}
+		}
+		print ("\n");
+	}
+	return (0);
+}
+
+//******************************************************************************
+// Events
+//******************************************************************************
+
+change bus_in$ {
+	string temp[64];
+
+	temp = getID(bus_in$);
+
+	if ( temp = bus_id || temp = "all") {
+		parseLine(removeID(bus_in$));
+	}
+}              
+           
+//******************************************************************************
+// Function Main()
+//******************************************************************************
+
+function main()
+{
+}

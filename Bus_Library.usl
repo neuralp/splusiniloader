@@ -1,0 +1,156 @@
+//******************************************************************************
+// Program 			: Bus Communications Library
+// Written By 		: Nicholas Pepper
+//******************************************************************************
+
+//******************************************************************************
+// Structures
+//******************************************************************************
+
+//******************************************************************************
+// Global Variables
+//******************************************************************************
+
+//******************************************************************************
+// Functions
+//******************************************************************************
+
+/***************************************************************
+function : wspRemove() : removes both leading and trailing white
+			space from an input string
+INPUT : input : string input
+OUTPUT : the same string but without leading and trailing white
+			space
+***************************************************************/
+string_function wspRemove(string input) {
+	integer start, end;	//determine where the string starts and ends
+	
+	start = 1;
+	end = len(input);
+	
+	while( byte(input, start) = 32) {
+		start = start + 1;
+	}
+	while( byte(input, end) = 32) {
+		end = end - 1;
+	}
+	
+	return (mid(input, start, end - start + 1));
+}
+
+/***************************************************************
+function : splitLine() : parses 'line' into the command and data
+		   portion (seperated by a '=').
+INPUT : line : the string to parse
+OUTPUT : command : the part before the equal sign, if no equal
+		 sign is found, then the whole line is returned as the
+		 command
+		 data : the data portion (after the equal sign)
+***************************************************************/
+function splitLine(string line, string command, string data)
+{
+	integer eqp;
+	
+	eqp = find("=", line);
+	
+	if (eqp != 0)
+	{
+		command = wspRemove(left(line, eqp-1));
+		data = wspRemove(right(line, len(line)-eqp));
+	}
+	else
+	{
+		command = line;
+	}
+}
+
+/***************************************************************
+function : removeID() : Removes ID from the end of the string.
+INPUT : line : the string to parse
+OUTPUT : line without the ID section of the line
+***************************************************************/
+string_function getID(string line)
+{
+	integer eqp;
+	
+	eqp = find("::", line);
+	
+	if (eqp != 0)
+	{
+		return (left(line, eqp-1));
+	}
+	else
+	{
+ 		return ("");
+	}
+}
+
+/***************************************************************
+function : removeID() : Removes ID from the end of the string.
+INPUT : line : the string to parse
+OUTPUT : line without the ID section of the line
+***************************************************************/
+string_function removeID(string line)
+{
+	integer eqp;
+	string temp[256];
+
+	eqp = find("::", line);
+	
+	if (eqp != 0)
+	{
+		temp = right(line, len(line) - eqp - 1);
+		return (temp);
+	}
+	else
+	{
+ 		return (line);
+	}
+}
+
+/***************************************************************
+function : removeID() : Takes a string representation of a mac
+		   and converts it to the hex representation
+INPUT : line : the string to parse
+OUTPUT : line without the ID section of the line
+***************************************************************/
+string_function parseMAC(string input) {
+	integer i;
+	integer char;
+	integer outChar;
+	integer isHigh;
+	string output[6];
+	
+	output = "";	
+	isHigh = 0;
+	input = lower(input);
+	
+	for (i = 1 to len(input) ) {
+		char = byte(input, i);
+		
+		//if charachter is 0-9 or a-f
+		if(char >= 48 && char <= 57) {
+			char = char - 48;
+		}
+		else if (char >= 97 && char <= 102) {
+			char = char - 87;
+		}
+		else
+			char = 65535;
+			
+		if (char != 65535) {
+			if (isHigh) {
+				outChar = outChar | char;
+				output = output + chr(outChar);
+				isHigh = 0;
+			}
+			else {
+				outChar = char;
+				outChar = outChar << 4;
+				isHigh = 1;
+			}
+		}
+	}
+	
+	return(output);
+}
