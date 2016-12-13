@@ -34,7 +34,9 @@ Format of the file for generic signals:
 `<value_type><value_number>=<data>`
 
 `dv1=0 (or 1) : set digital output ### to either 0 or 1`
+
 `av1=512 : set analog value 1 to a value of 512`
+
 `sv1=Conference : set serial value 1 to "Conference"`
 
 Format of the file for other module signals:
