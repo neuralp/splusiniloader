@@ -1,5 +1,5 @@
 # splusiniloader
-
+---
 Program : INI Loader 1.0
 By      : Nicholas Pepper
 Version : 1.0
@@ -37,9 +37,9 @@ sv1=Conference : set serial value 1 to "Conference"`
 
 Format of the file for other module signals:
 
-`[<section>]
+`[<section>]`
 
-<key>=<value>`
+`<key>=<value>`
 
 Version History
 
