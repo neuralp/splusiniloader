@@ -21,7 +21,7 @@ will do the conversion to ticks for you.  This is uesful for time parameters.
 **NOTE** that I do not process HH.MM.SSs format, everything must be in generic
 seconds with the maximum time of 655.35 seconds.
 
-[section]
+`[section]`
 
 The above formatting starts a section, and all values, no matter what they are,
 are directly passed to the bus out.  The only exception to this is still comments,
@@ -29,7 +29,7 @@ which will just be dropped.
 
 Format of the file for generic signals:
 
-<value_type><value_number>=<data>
+`<value_type><value_number>=<data>`
 
 dv1=0 (or 1) : set digital output ### to either 0 or 1
 av1=512 : set analog value 1 to a value of 512
@@ -37,9 +37,9 @@ sv1=Conference : set serial value 1 to "Conference"
 
 Format of the file for other module signals:
 
-[<section>]
+`[<section>]
 
-<key>=<value>
+<key>=<value>`
 
 Version History
 
